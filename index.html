@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#030812">
+  <meta name="robots" content="noindex">
+  <title>JohnsArbBets</title>
+  <link rel="icon" href="assets/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <img class="logo" src="assets/logo.png" alt="JohnsArbBets logo">
+      <div class="names">
+        <div class="row"><h1 id="title">Johns<span class="p">ArbBets</span></h1><span class="sub" id="online">● laden…</span></div>
+        <div class="tagline" id="tagline"></div>
+      </div>
+    </div>
+    <p class="intro">Arbitrage-scanner voor Nederlandse bookmakers (top-7 competities). Kansen komen direct binnen via
+      Telegram; hier zie je het overzicht, de bookmakers, markten en het logboek.</p>
+    <div class="meta">
+      <span>bijgewerkt: <span class="v" id="m-upd">–</span></span>
+      <span>bookmakers: <span class="v" id="m-books">–</span></span>
+      <span>wedstrijden: <span class="v" id="m-matches">–</span></span>
+      <span>inzet/arb: <span class="v" id="m-stake">–</span></span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" id="tabs">
+    <a href="#home" data-tab="home">Home</a>
+    <a href="#arbs" data-tab="arbs">Arbs <span class="badge hot" id="b-open">0 open</span></a>
+    <a href="#bookmakers" data-tab="bookmakers">Bookmakers <span class="badge" id="b-books">–</span></a>
+    <a href="#markten" data-tab="markten">Markten</a>
+    <a href="#odds" data-tab="odds">Odds</a>
+    <a href="#logboek" data-tab="logboek">Logboek</a>
+  </nav>
+
+  <section id="tab-home"></section>
+  <section id="tab-arbs" hidden></section>
+  <section id="tab-bookmakers" hidden></section>
+  <section id="tab-markten" hidden></section>
+  <section id="tab-odds" hidden></section>
+  <section id="tab-logboek" hidden></section>
+
+  <footer>Odds komen rechtstreeks van de bookmakers en kunnen enkele minuten achterlopen. Controleer altijd vóór je inzet.
+    Geen affiliate-links.</footer>
+</main>
+<div id="tip" hidden></div>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
