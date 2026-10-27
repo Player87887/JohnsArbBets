@@ -171,8 +171,8 @@
     let h = `<div class="grid2">
       <div class="card status-card ${bs.cls}"><div class="pulse"></div><div>
         <div class="kicker">status arb-bot</div><h2>${bs.label[0].toUpperCase() + bs.label.slice(1)}</h2>
-        <p>${bs.text || `Scant ${books.length} bookmakers elke ${Math.round(st.interval_s / 60)} min · draait al ${upFor}.`}</p>
-        <div class="hb">laatste ronde: ${hm(lc.time)} (${num(lc.duration, 0)} s) · min. winst ${num(st.min_profit_pct, 1)}%</div>
+        <p>${bs.text || `Scant ${books.length} bookmakers ${st.pace_mode === "fixed" ? `elke ${st.interval_s} s` : "elk in een eigen, zelflerend tempo"} · draait al ${upFor}.`}</p>
+        <div class="hb">laatste analyse: ${hm(lc.time)} · min. winst ${num(st.min_profit_pct, 1)}%</div>
       </div></div>
       <div class="card"><div class="kicker">meldingen op je telefoon</div>
         <p class="muted" style="margin-top:6px">Elke kans direct in Telegram, met ✅/❌-feedback en knoppen voor inzet en markten.</p>
@@ -274,6 +274,7 @@
         <dt>selecties/wedstr.</dt><dd>${num(b.sel_per_event, 1)}</dd>
         <dt>uptime 24 u</dt><dd>${b.uptime_24h == null ? "–" : b.uptime_24h + "%"}</dd>
         <dt>ophaaltijd</dt><dd>${b.duration == null ? "–" : num(b.duration, 1) + " s"}</dd>
+        <dt>tempo</dt><dd>${b.tempo == null ? "–" : "elke " + num(b.tempo, 0) + " s" + (b.tempo_state === "slow" ? " · afgeremd" : "")}</dd>
         <dt>laatst ok</dt><dd>${ago(b.last_ok)}</dd></dl>
         ${b.error && !b.ok ? `<div class="book"><div class="err">${esc(b.error)}</div></div>` : ""}
         <div class="strip">${strip || '<i class="n"></i>'}</div>
