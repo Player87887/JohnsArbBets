@@ -167,7 +167,8 @@
     const last24 = (ar?.history || []).filter((h) => Date.now() - new Date(h.first_seen) < 864e5);
     const best24 = Math.max(0, ...last24.map((h) => h.peak || h.pct));
     const upFor = ago(st.started_at).replace(" geleden", "");
-    const tg = C.telegram || st.telegram;
+    const tg = st.telegram || C.telegram;
+    const isChannel = st.telegram_kind === "channel";
     let h = `<div class="grid2">
       <div class="card status-card ${bs.cls}"><div class="pulse"></div><div>
         <div class="kicker">status arb-bot</div><h2>${bs.label[0].toUpperCase() + bs.label.slice(1)}</h2>
@@ -175,8 +176,8 @@
         <div class="hb">laatste analyse: ${hm(lc.time)} · min. winst ${num(st.min_profit_pct, 1)}%</div>
       </div></div>
       <div class="card"><div class="kicker">meldingen op je telefoon</div>
-        <p class="muted" style="margin-top:6px">Elke kans direct in Telegram, met ✅/❌-feedback en knoppen voor inzet en markten.</p>
-        ${tg ? `<a class="cta" href="${esc(tg)}" target="_blank" rel="noopener">✈ Open de Telegram-bot</a>` : `<span class="cta off">Telegram-link niet ingesteld</span>`}
+        <p class="muted" style="margin-top:6px">${isChannel ? "Volg het kanaal en krijg elke arbitrage-kans direct op je telefoon: odds, inzetten en gegarandeerde winst." : "Elke kans direct in Telegram, met ✅/❌-feedback en knoppen voor inzet en markten."}</p>
+        ${tg ? `<a class="cta" href="${esc(tg)}" target="_blank" rel="noopener">✈ ${isChannel ? "Volg het Telegram-kanaal" : "Open de Telegram-bot"}</a>` : `<span class="cta off">Telegram-link niet ingesteld</span>`}
       </div></div>
     <div class="tiles">
       <div class="tile"><div class="kicker">bookmakers actief</div><div class="big">${books.filter((b) => b.ok).length}<span class="muted" style="font-size:16px">/${books.length}</span></div><div class="small">${(st.not_supported || []).length} niet ondersteund</div></div>
