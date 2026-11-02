@@ -4,6 +4,6 @@ window.ARB_CONFIG = {
   "branch": "data",
   "title": "JohnsArbBets",
   "tagline": "arbitrage betting × data analysis",
-  "telegram": "https://t.me/SportsArb87887_Bot",
+  "telegram": "https://t.me/+a359wYoUynk2YTZk",
   "refresh_s": 120
 };
