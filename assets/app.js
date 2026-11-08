@@ -158,6 +158,11 @@
     $("m-stake").textContent = st.bankroll || "–";
     $("b-open").textContent = `${(S.arbs?.open || []).length} open`;
     $("b-books").textContent = `${books.filter((b) => b.ok).length}/${books.length}`;
+    if (st.coverage && $("b-comp")) {
+      const miss = st.coverage.rows.reduce((n, r) => n + Object.values(r.cells).filter((c) => c.state === "mist").length, 0);
+      $("b-comp").textContent = miss ? `${miss} ⚠️` : `${st.coverage.rows.filter((r) => r.max).length} actief`;
+      $("b-comp").classList.toggle("hot", miss > 0);
+    }
   }
 
   function renderHome() {
@@ -314,6 +319,34 @@
     bindTips($("tab-markten"));
   }
 
+  function renderCompetitions() {
+    const st = S.status;
+    const el = $("tab-competities");
+    if (!st) { el.innerHTML = `<div class="empty">Laden…</div>`; return; }
+    const cov = st.coverage;
+    if (!cov) { el.innerHTML = `<div class="empty">Nog geen gegevens – werk de bot bij.</div>`; return; }
+    const books = cov.books;
+    const issues = cov.rows.reduce((n, r) => n + Object.values(r.cells).filter((c) => c.state === "mist").length, 0);
+    let h = sectionHead("competities");
+    h += `<p class="muted" style="margin-bottom:10px">Alle competities die de bot volgt, met per bookmaker het aantal wedstrijden dat nu binnenkomt (komende ${esc(String(st.days_ahead || 7))} dagen).
+      Bekers, Europees en landenwedstrijden zoekt de bot per site zelf op naam op.
+      <span class="pill bad">0!</span> = de meeste andere bookmakers hebben hier wél wedstrijden → waarschijnlijk niet goed opgehaald ·
+      <span class="pill">·</span> = competitie niet gevonden op deze site · <span class="pill bad">fout</span> = site faalt nu.</p>`;
+    h += `<div class="tablewrap"><table class="heat"><thead><tr><th>competitie</th><th class="num">max</th><th class="num">books</th>${books.map((b) => `<th class="num" title="${esc(b)}">${esc(b.length > 8 ? b.slice(0, 7) + "…" : b)}</th>`).join("")}</tr></thead><tbody>`;
+    h += cov.rows.map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${r.max}</td><td class="num">${r.books_with}/${books.length}</td>${books.map((b) => {
+      const c = r.cells[b] || { n: 0, ids: [], state: "geen-id" };
+      const tip = `${b} · ${r.name}: ${c.n} wedstrijden · ID's: ${c.ids.length ? c.ids.join(", ") : "geen"}`;
+      if (c.state === "fout") return `<td class="cell zero" data-tip="${esc(tip)}"><span class="pill bad">fout</span></td>`;
+      if (c.state === "mist") return `<td class="cell" data-tip="${esc(tip + " – mist waarschijnlijk")}"><span class="pill bad">0!</span></td>`;
+      if (c.state === "geen-id" && !c.n) return `<td class="cell zero" data-tip="${esc(tip)}">·</td>`;
+      const a = r.max ? (0.12 + 0.6 * c.n / r.max).toFixed(2) : 0;
+      return `<td class="cell ${c.n ? "" : "zero"}" style="${c.n ? `background:rgba(var(--signal-rgb),${a})` : ""}" data-tip="${esc(tip + (c.state === "weinig" ? " – opvallend weinig" : ""))}">${c.n ? c.n + (c.state === "weinig" ? "?" : "") : "–"}</td>`;
+    }).join("")}</tr>`).join("");
+    h += `</tbody></table></div><p class="muted" style="margin-top:8px">${issues ? `⚠️ ${issues} combinatie(s) waar een bookmaker waarschijnlijk wedstrijden mist.` : "✅ Geen bookmaker lijkt wedstrijden te missen."} Beweeg over een vakje voor de gebruikte competitie-ID's.</p>`;
+    el.innerHTML = h;
+    bindTips(el);
+  }
+
   const OF = { q: "", league: "" };
   function renderOdds() {
     const st = S.status;
@@ -371,7 +404,7 @@
   }
 
   // ---------------------------------------------------------------- routing
-  const RENDER = { home: renderHome, arbs: renderArbs, bookmakers: renderBookmakers, markten: renderMarkets, odds: renderOdds, logboek: renderLog };
+  const RENDER = { home: renderHome, arbs: renderArbs, bookmakers: renderBookmakers, markten: renderMarkets, competities: renderCompetitions, odds: renderOdds, logboek: renderLog };
   function renderAll() {
     MKT = Object.fromEntries((S.status?.markets || []).map((m) => [m.group, m.label]));
     renderHeader();
