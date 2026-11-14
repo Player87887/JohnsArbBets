@@ -182,3 +182,12 @@ footer { margin-top:36px; font-family:var(--mono); font-size:11.5px; color:var(-
   .brand h1 { font-size:22px; }
   .tagline { font-size:10.5px; letter-spacing:1.2px; }
 }
+
+/* ---------- speelrondes ---------- */
+.pos { color:var(--good) !important; } .neg { color:var(--neg) !important; }
+.tile .big.pos, .tile .big.neg { font-size:26px; }
+code { font-family:var(--mono); font-size:12px; background:var(--panel-2); border:1px solid var(--line); border-radius:5px; padding:0 5px; }
+.chip { background:var(--panel); border:1px solid var(--line); color:var(--ink-dim); border-radius:999px; padding:5px 12px;
+  font:inherit; font-size:12.5px; cursor:pointer; }
+.chip:hover { color:var(--ink); } .chip.on { color:#fff; background:rgba(var(--signal-rgb),.18); border-color:rgba(var(--signal-rgb),.6); }
+.lg-link { text-decoration:none; } .lg-link:hover { color:var(--signal); }
