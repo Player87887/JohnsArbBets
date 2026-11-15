@@ -5,7 +5,7 @@
     window.ARB_CONFIG || {});
   const TZ = "Europe/Amsterdam";
   const LEAGUES = { NED: "Eredivisie", ENG: "Premier League", ESP: "LaLiga", ITA: "Serie A", GER: "Bundesliga", FRA: "Ligue 1", POR: "Primeira Liga" };
-  const S = { status: null, arbs: null, rondes: null, cycles: null, log: null, odds: null, oddsAt: 0, tab: "home" };
+  const S = { status: null, arbs: null, rondes: null, boosts: null, cycles: null, log: null, odds: null, oddsAt: 0, tab: "home" };
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const num = (x, d = 2) => (x == null || isNaN(x)) ? "–" : Number(x).toLocaleString("nl-NL", { minimumFractionDigits: d, maximumFractionDigits: d });
@@ -46,8 +46,9 @@
     return r.json();
   }
   async function loadAll() {
-    const [st, ar, cy, lg, rd] = await Promise.allSettled([getJSON("status.json"), getJSON("arbs.json"), getJSON("cycles.json"), getJSON("log.json"), getJSON("rondes.json")]);
+    const [st, ar, cy, lg, rd, bs] = await Promise.allSettled([getJSON("status.json"), getJSON("arbs.json"), getJSON("cycles.json"), getJSON("log.json"), getJSON("rondes.json"), getJSON("boosts.json")]);
     if (rd.status === "fulfilled") S.rondes = rd.value;
+    if (bs.status === "fulfilled") S.boosts = bs.value;
     if (st.status === "fulfilled") S.status = st.value;
     if (ar.status === "fulfilled") S.arbs = ar.value;
     if (cy.status === "fulfilled") S.cycles = cy.value;
@@ -158,6 +159,10 @@
     $("m-matches").textContent = String(st.last_cycle?.multi ?? "–");
     $("m-stake").textContent = st.bankroll || "–";
     $("b-open").textContent = `${(S.arbs?.open || []).length} open`;
+    if ($("b-boosts") && S.boosts && !S.boosts.disabled) {
+      const n = (S.boosts.active || []).filter((b) => b.pct != null && b.pct >= (S.boosts.min_pct || 20)).length;
+      $("b-boosts").textContent = n; $("b-boosts").classList.toggle("hot", n > 0);
+    }
     if ($("b-rondes") && S.rondes && !S.rondes.disabled) {
       const n = (S.rondes.open || []).length;
       $("b-rondes").textContent = n ? `${n} lopend` : `${S.rondes.totals?.all?.rounds || 0}`;
@@ -568,8 +573,101 @@
     bindTips(el);
   }
 
+  // ---------------------------------------------------------------- boosts
+  const BF = { day: "all", book: "", unknown: false };
+  function bDay(iso) {
+    if (!iso) return "zonder datum";
+    const d = new Date(iso), key = (x) => x.toLocaleDateString("nl-NL", { timeZone: TZ });
+    const today = new Date(), tom = new Date(Date.now() + 864e5);
+    if (key(d) === key(today)) return "Vandaag";
+    if (key(d) === key(tom)) return "Morgen";
+    return d.toLocaleDateString("nl-NL", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
+  }
+  function bRow(b, min) {
+    const pct = b.pct, big = pct != null && pct >= min;
+    const col = pct == null ? "" : pct >= 40 ? "var(--good)" : pct >= min ? "var(--signal)" : "var(--ink-faint)";
+    const SRC = { exact: ["ok", "exact", "door de bookmaker zelf"], opgezocht: ["", "opgezocht", "dezelfde bet als gewone markt bij Unibet"],
+      geschat: ["", "geschat", "combi van gewone markten of mediaan van je andere bookmakers"] };
+    const sc = SRC[b.old_src];
+    const src = sc ? `<span class="pill ${sc[0]}" title="${esc(sc[2] + (b.old_detail ? " · " + b.old_detail : ""))}">${sc[1]}</span>` : "";
+    const meta = [b.max_stake ? `max €${num(b.max_stake, 0)}` : "", b.used ? `${esc(b.used)} gebruikt` : "", b.expires ? `t/m ${dayhm(b.expires)}` : ""].filter(Boolean).join(" · ");
+    const legs = (b.legs || []).length > 1 ? `<div class="muted" style="font-size:11.5px">${b.legs.slice(0, 8).map((l) => "• " + esc(l)).join("<br>")}</div>` : "";
+    const img = b.image ? `<a href="${esc(b.image)}" target="_blank" rel="noopener"><img src="${esc(b.image)}" alt="" style="max-width:220px;border-radius:6px;margin-top:4px;display:block"></a>` : "";
+    const newCell = b.new ? `<b${b.new_approx ? ' title="benadering: TonyBet rondt zelf iets anders af"' : ""}>${b.new_approx ? "≈" : ""}${num(b.new)}</b>` : (b.image ? `<span class="muted" title="staat in het plaatje">🖼</span>` : "–");
+    return `<tr class="${big || b.image ? "" : "dim"}"><td class="mono">${b.start ? dayhm(b.start) : "–"}</td>
+      <td><b>${esc(b.book)}</b>${b.top ? ` <span class="pill ok" title="plek in de top van deze bookmaker">#${b.top}</span>` : ""}<div class="muted" style="font-size:11px">${esc(b.name && b.name !== b.title ? b.name : b.kind || "")}</div></td>
+      <td>${esc(b.event || "")}<div style="color:var(--ink)">${esc(b.title || "")}${b.selection ? ` → <b>${esc(b.selection)}</b>` : ""}</div>${legs}
+        ${meta ? `<div class="muted" style="font-size:11px">${meta}</div>` : ""}${img}</td>
+      <td class="num">${b.old ? num(b.old) : "–"}${b.old_banner ? `<div class="muted" style="font-size:11px" title="volgens de banner">banner ${num(b.old_banner)}</div>` : ""}</td><td class="num">${newCell}</td>
+      <td class="num">${pct == null ? `<span class="muted">?</span>` : `<b style="color:${col}">+${num(pct, 0)}%</b>`}</td><td>${src}</td>
+      <td>${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">open ↗</a>` : ""}</td></tr>`;
+  }
+  function bTable(rows, min) {
+    return `<div class="tablewrap"><table class="boosts"><thead><tr><th>aftrap</th><th>bookmaker</th><th>boost</th><th class="num">oud</th><th class="num">nieuw</th><th class="num">boost</th><th>oude odd</th><th></th></tr></thead>
+      <tbody>${rows.map((b) => bRow(b, min)).join("")}</tbody></table></div>`;
+  }
+  function renderBoosts() {
+    const el = $("tab-boosts"), bd = S.boosts;
+    if (!bd) { el.innerHTML = `<div class="empty">Laden…</div>`; return; }
+    if (bd.disabled) { el.innerHTML = `<div class="empty">Boost-radar staat uit (config: <code>boosts.enabled</code>).</div>`; return; }
+    const min = bd.min_pct || 20, act = bd.active || [];
+    const books = [...new Set(act.map((b) => b.book))].sort();
+    const pass = (b) => (!BF.book || b.book === BF.book) && (BF.day === "all" || bDay(b.start) === BF.day);
+    const perBook = bd.per_book || 3, maxOdds = bd.max_odds || 8;
+    const big = act.filter((b) => b.pct != null && b.pct >= min && pass(b)).sort((a, b) => b.pct - a.pct);
+    const top = big.filter((b) => b.top).sort((a, b) => a.book.localeCompare(b.book) || a.top - b.top);
+    const rest = big.filter((b) => !b.top);
+    const small = act.filter((b) => b.pct != null && b.pct < min && pass(b)).sort((a, b) => b.pct - a.pct);
+    const banners = act.filter((b) => b.image && b.pct == null && pass(b));
+    const promos = act.filter((b) => b.kind === "promo" && (!BF.book || b.book === BF.book));
+    const unk = act.filter((b) => b.pct == null && !b.image && b.kind !== "promo" && pass(b)).sort((a, b) => (a.start || "").localeCompare(b.start || ""));
+    const st = bd.status || {};
+    let h = `<div class="card"><div class="kicker">boost-radar</div>
+      <p class="muted" style="margin-top:6px">Elke 15 minuten worden de boosts van je bookmakers verzameld. <b>Oude odd</b>: <i>exact</i> = de bookmaker geeft hem zelf;
+      <i>opgezocht</i> = dezelfde bet als gewone markt bij Unibet; <i>geschat</i> = combi van gewone markten (vermenigvuldigd) of de mediaan van je andere bookmakers.
+      Telegram meldt per bookmaker per dag de beste <b>${perBook}</b> boosts vanaf <b>+${num(min, 0)}%</b> met odd ≤ ${num(maxOdds, 0)}: een hoger % telt mee, een hoge odd telt minder zwaar. Bet365 zit er niet in.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${Object.keys(st).sort().map((k) => `<span class="pill ${st[k].ok ? (st[k].n || st[k].promos ? "ok" : "") : "bad"}" title="${esc(st[k].error || st[k].note || "")}">${esc(k)} ${st[k].ok ? (st[k].n || 0) + (st[k].promos ? "+" + st[k].promos : "") : "✕"}</span>`).join("")}</div></div>`;
+    const days = ["all", ...new Set(act.filter((b) => b.kind !== "promo").map((b) => bDay(b.start)))];
+    h += `<div class="filters" style="margin-top:14px">${days.map((d) => `<button class="chip ${BF.day === d ? "on" : ""}" data-day="${esc(d)}">${d === "all" ? "Alle dagen" : esc(d)}</button>`).join("")}
+      <select id="bk-book"><option value="">Alle bookmakers</option>${books.map((b) => `<option ${BF.book === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></div>`;
+    h += `<div class="tiles"><div class="tile"><div class="kicker">top ${perBook} per bookmaker</div><div class="big">${top.length}</div><div class="small">${new Set(top.map((b) => b.book)).size} bookmaker(s) · odd ≤ ${num(maxOdds, 0)}</div></div>
+      <div class="tile"><div class="kicker">kleiner dan ${num(min, 0)}%</div><div class="big">${small.length}</div><div class="small">oude odd bekend</div></div>
+      <div class="tile"><div class="kicker">oude odd onbekend</div><div class="big">${unk.length}</div><div class="small">+ ${banners.length} banner(s), ${promos.length} promo('s)</div></div>
+      <div class="tile"><div class="kicker">bookmakers met boosts</div><div class="big">${books.length}</div><div class="small">van ${Object.keys(st).length} gecontroleerd</div></div></div>`;
+    h += sectionHead(`top ${perBook} per bookmaker (≥ ${num(min, 0)}%, odd ≤ ${num(maxOdds, 0)}, hoog % én lage odd)`);
+    h += top.length ? bTable(top, min) : `<div class="empty">Geen boosts boven de grens${BF.day !== "all" || BF.book ? " met dit filter" : ""}.</div>`;
+    if (rest.length) {
+      h += sectionHead(`overige boosts ≥ ${num(min, 0)}% (buiten de top of odd > ${num(maxOdds, 0)})`);
+      h += bTable(rest, min);
+    }
+    if (banners.length) {
+      h += sectionHead("superboost-banners (boost-odd staat in het plaatje)");
+      h += bTable(banners, min);
+    }
+    if (promos.length) {
+      h += sectionHead("winstboosts met voorwaarden");
+      h += `<div class="tablewrap"><table><thead><tr><th>bookmaker</th><th>boost</th><th class="num">winst</th><th>voorwaarden</th><th>geldig t/m</th><th></th></tr></thead><tbody>${
+        promos.map((b) => `<tr><td><b>${esc(b.book)}</b></td><td>${esc(b.title || "")}</td><td class="num"><b>+${num(b.promo_pct, 0)}%</b></td>
+          <td class="muted">${esc(b.conditions || "")}${b.max_stake ? ` · max €${num(b.max_stake, 0)}` : ""}</td><td class="mono">${b.expires ? dayhm(b.expires) : "–"}</td>
+          <td>${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">open ↗</a>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    }
+    h += sectionHead("oude odd onbekend", `<a href="#" id="bk-unk">${BF.unknown ? "verberg" : `toon (${unk.length})`}</a>`);
+    h += BF.unknown ? (unk.length ? bTable(unk, min) : `<div class="empty">Geen.</div>`) : `<p class="muted">Specials zonder vergelijkbare gewone markt (bijv. spelersbets). Klik op "toon" om ze te zien.</p>`;
+    if (small.length) {
+      h += `<details class="ev" style="margin-top:14px"><summary><span class="m">Kleinere boosts (&lt; ${num(min, 0)}%) · ${small.length}</span></summary><div class="body">${bTable(small.slice(0, 200), min)}</div></details>`;
+    }
+    const hist = (bd.history || []).filter((b) => b.pct != null && b.pct >= min && (!BF.book || b.book === BF.book)).slice(0, 60);
+    if (hist.length) {
+      h += `<details class="ev" style="margin-top:10px"><summary><span class="m">Verlopen grote boosts (laatste 14 dagen) · ${hist.length}</span></summary><div class="body">${bTable(hist, min)}</div></details>`;
+    }
+    el.innerHTML = h;
+    el.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => { BF.day = b.dataset.day; renderBoosts(); }));
+    $("bk-book").onchange = (e) => { BF.book = e.target.value; renderBoosts(); };
+    $("bk-unk").onclick = (e) => { e.preventDefault(); BF.unknown = !BF.unknown; renderBoosts(); };
+  }
+
   // ---------------------------------------------------------------- routing
-  const RENDER = { home: renderHome, arbs: renderArbs, bookmakers: renderBookmakers, markten: renderMarkets, competities: renderCompetitions, odds: renderOdds, rondes: renderRondes, logboek: renderLog };
+  const RENDER = { home: renderHome, arbs: renderArbs, bookmakers: renderBookmakers, markten: renderMarkets, competities: renderCompetitions, odds: renderOdds, rondes: renderRondes, boosts: renderBoosts, logboek: renderLog };
   function renderAll() {
     MKT = Object.fromEntries((S.status?.markets || []).map((m) => [m.group, m.label]));
     renderHeader();

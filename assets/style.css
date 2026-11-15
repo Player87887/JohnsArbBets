@@ -191,3 +191,7 @@ code { font-family:var(--mono); font-size:12px; background:var(--panel-2); borde
   font:inherit; font-size:12.5px; cursor:pointer; }
 .chip:hover { color:var(--ink); } .chip.on { color:#fff; background:rgba(var(--signal-rgb),.18); border-color:rgba(var(--signal-rgb),.6); }
 .lg-link { text-decoration:none; } .lg-link:hover { color:var(--signal); }
+
+/* ---------- boosts ---------- */
+table.boosts tr.dim td { opacity:.6; }
+table.boosts td { vertical-align:top; }
