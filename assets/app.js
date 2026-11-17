@@ -626,7 +626,14 @@
       <p class="muted" style="margin-top:6px">Elke 15 minuten worden de boosts van je bookmakers verzameld. <b>Oude odd</b>: <i>exact</i> = de bookmaker geeft hem zelf;
       <i>opgezocht</i> = dezelfde bet als gewone markt bij Unibet; <i>geschat</i> = combi van gewone markten (vermenigvuldigd) of de mediaan van je andere bookmakers.
       Telegram meldt per bookmaker per dag de beste <b>${perBook}</b> boosts vanaf <b>+${num(min, 0)}%</b> met odd ≤ ${num(maxOdds, 0)}: een hoger % telt mee, een hoge odd telt minder zwaar. Bet365 zit er niet in.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${Object.keys(st).sort().map((k) => `<span class="pill ${st[k].ok ? (st[k].n || st[k].promos ? "ok" : "") : "bad"}" title="${esc(st[k].error || st[k].note || "")}">${esc(k)} ${st[k].ok ? (st[k].n || 0) + (st[k].promos ? "+" + st[k].promos : "") : "✕"}</span>`).join("")}</div></div>`;
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">${Object.keys(st).sort().map((k) => {
+        const mine = act.filter((b) => b.book === k && b.kind !== "promo");
+        const nBig = mine.filter((b) => b.pct != null && b.pct >= min).length, nSmall = mine.filter((b) => b.pct != null && b.pct < min).length;
+        const nBan = mine.filter((b) => b.image && b.pct == null).length, nUnk = mine.length - nBig - nSmall - nBan;
+        const tip = st[k].ok ? `${nBig} ≥ ${num(min, 0)}% · ${nSmall} kleiner · ${nUnk} oude odd onbekend${nBan ? ` · ${nBan} banner` : ""}` : (st[k].error || "");
+        return `<span class="pill ${st[k].ok ? (mine.length ? "ok" : "") : "bad"}" data-pbook="${esc(k)}" style="cursor:pointer" title="${esc(tip)} — klik om alleen ${esc(k)} te zien">${esc(k)} ${st[k].ok ? `${nBig}<span class="muted">/${mine.length}</span>` : "✕"}</span>`;
+      }).join("")}</div>
+      <p class="muted" style="font-size:11.5px;margin-top:6px">Per bookmaker: aantal ≥ ${num(min, 0)}% / totaal gevonden. Klik op een bookmaker om al zijn boosts te zien, ook kleinere en die zonder bekende oude odd.</p></div>`;
     const days = ["all", ...new Set(act.filter((b) => b.kind !== "promo").map((b) => bDay(b.start)))];
     h += `<div class="filters" style="margin-top:14px">${days.map((d) => `<button class="chip ${BF.day === d ? "on" : ""}" data-day="${esc(d)}">${d === "all" ? "Alle dagen" : esc(d)}</button>`).join("")}
       <select id="bk-book"><option value="">Alle bookmakers</option>${books.map((b) => `<option ${BF.book === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></div>`;
@@ -651,10 +658,11 @@
           <td class="muted">${esc(b.conditions || "")}${b.max_stake ? ` · max €${num(b.max_stake, 0)}` : ""}</td><td class="mono">${b.expires ? dayhm(b.expires) : "–"}</td>
           <td>${b.url ? `<a href="${esc(b.url)}" target="_blank" rel="noopener">open ↗</a>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
     }
-    h += sectionHead("oude odd onbekend", `<a href="#" id="bk-unk">${BF.unknown ? "verberg" : `toon (${unk.length})`}</a>`);
-    h += BF.unknown ? (unk.length ? bTable(unk, min) : `<div class="empty">Geen.</div>`) : `<p class="muted">Specials zonder vergelijkbare gewone markt (bijv. spelersbets). Klik op "toon" om ze te zien.</p>`;
+    h += sectionHead("oude odd onbekend", `<a href="#" id="bk-unk">${BF.unknown || BF.book ? "verberg" : `toon (${unk.length})`}</a>`);
+    const showUnk = BF.unknown || !!BF.book;
+    h += showUnk ? (unk.length ? bTable(unk, min) : `<div class="empty">Geen.</div>`) : `<p class="muted">Specials zonder vergelijkbare gewone markt (bijv. spelersbets). Klik op "toon" om ze te zien.</p>`;
     if (small.length) {
-      h += `<details class="ev" style="margin-top:14px"><summary><span class="m">Kleinere boosts (&lt; ${num(min, 0)}%) · ${small.length}</span></summary><div class="body">${bTable(small.slice(0, 200), min)}</div></details>`;
+      h += `<details class="ev" style="margin-top:14px"${BF.book ? " open" : ""}><summary><span class="m">Kleinere boosts (&lt; ${num(min, 0)}%) · ${small.length}</span></summary><div class="body">${bTable(small.slice(0, 200), min)}</div></details>`;
     }
     const hist = (bd.history || []).filter((b) => b.pct != null && b.pct >= min && (!BF.book || b.book === BF.book)).slice(0, 60);
     if (hist.length) {
@@ -663,7 +671,8 @@
     el.innerHTML = h;
     el.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => { BF.day = b.dataset.day; renderBoosts(); }));
     $("bk-book").onchange = (e) => { BF.book = e.target.value; renderBoosts(); };
-    $("bk-unk").onclick = (e) => { e.preventDefault(); BF.unknown = !BF.unknown; renderBoosts(); };
+    $("bk-unk").onclick = (e) => { e.preventDefault(); if (BF.book && !BF.unknown) { BF.book = ""; } else BF.unknown = !BF.unknown; renderBoosts(); };
+    el.querySelectorAll("[data-pbook]").forEach((p) => p.addEventListener("click", () => { BF.book = BF.book === p.dataset.pbook ? "" : p.dataset.pbook; renderBoosts(); }));
   }
 
   // ---------------------------------------------------------------- routing
