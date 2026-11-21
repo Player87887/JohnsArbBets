@@ -487,30 +487,39 @@
           <td class="num ${cls(b.roi_pct)}">${sgn(b.roi_pct, 1)}%</td><td class="num ${cls(b.anti_roi_pct)}">${sgn(b.anti_roi_pct, 1)}%</td></tr>`).join("")}</tbody></table></div>`;
   }
   function matchTable(r) {
-    const rows = (r.matches || []).map((m) => {
+    const rid = String(r.id).replace(/[^a-zA-Z0-9]/g, "_");
+    const rows = (r.matches || []).map((m, i) => {
+      const nb = m.n != null ? m.n : (m.books ? Object.keys(m.books).length : null);
+      const nCell = `<td class="num">${nb == null ? "–" : nb ? `<a href="#" data-bk="${rid}-${i}" title="odds per bookmaker">${nb}</a>` : `<span style="color:var(--bad)">0</span>`}</td>`;
+      const name = `${esc(m.home)} – ${esc(m.away)}`;
+      if (m.result === "void") return `<tr class="dim"><td class="mono">${dayhm(m.kickoff)}</td><td>${name}</td><td colspan="4" class="muted">${esc(m.score || "afgelast")} – telt niet mee</td>${nCell}<td class="num">–</td></tr>`;
       const o = m.odds;
-      if (!o) return `<tr><td class="mono">${dayhm(m.kickoff)}</td><td>${esc(m.home)} – ${esc(m.away)}</td><td colspan="5" class="muted">geen odds</td></tr>`;
+      if (!o) return `<tr><td class="mono">${dayhm(m.kickoff)}</td><td>${name}</td><td colspan="4" class="muted">geen odds gevonden</td>${nCell}<td class="num">${m.score ? esc(m.score) : "–"}</td></tr>`;
       const fav = favOf(o), played = ["H", "D", "A"].includes(m.result);
       const cell = (s) => `<td class="cell ${m.result === s ? "best" : ""}">${num(o[s])}${s === fav ? ` <span class="muted" style="font-size:10px">fav</span>` : ""}${m.best ? `<div class="muted" style="font-size:10.5px">${num(m.best[s][0])} ${esc(m.best[s][1])}</div>` : ""}</td>`;
-      return `<tr><td class="mono">${dayhm(m.kickoff)}</td><td>${esc(m.home)} – ${esc(m.away)}${m.src && m.src !== r.book ? ` <span class="pill">${esc(m.src)}</span>` : ""}</td>
-        ${cell("H")}${cell("D")}${cell("A")}<td class="num">${num(100 * (1 / o.H + 1 / o.D + 1 / o.A - 1), 1)}%</td><td class="num">${m.score ? esc(m.score) : "–"}${played ? (m.result === fav ? " ✅" : " ⚡") : ""}</td></tr>`;
+      const tags = (m.src && m.src !== r.book ? ` <span class="pill" title="odds van">${esc(m.src)}</span>` : "") + (m.late ? ` <span class="pill" title="pas na de snapshot gevonden, vóór de eigen aftrap">laat</span>` : "") + (m.from_old ? ` <span class="pill" title="uit de oude gegevens">oud</span>` : "");
+      const bks = m.books ? Object.entries(m.books).sort((a, b) => a[0].localeCompare(b[0])) : [];
+      const detail = bks.length ? `<tr class="bkrow" id="bk-${rid}-${i}" style="display:none"><td></td><td colspan="7"><div style="display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px">${bks.map(([bk, v]) =>
+        `<span class="mono"><b>${esc(bk)}</b> ${num(v[0])} / ${num(v[1])} / ${num(v[2])}</span>`).join("")}${m.med ? `<span class="mono muted">mediaan ${num(m.med.H)} / ${num(m.med.D)} / ${num(m.med.A)}</span>` : ""}${m.close && m.close.odds ? `<span class="mono muted">slot (${esc(m.close.src || "")}) ${num(m.close.odds.H)} / ${num(m.close.odds.D)} / ${num(m.close.odds.A)}</span>` : ""}</div></td></tr>` : "";
+      return `<tr><td class="mono">${dayhm(m.kickoff)}</td><td>${name}${tags}</td>
+        ${cell("H")}${cell("D")}${cell("A")}<td class="num">${num(100 * (1 / o.H + 1 / o.D + 1 / o.A - 1), 1)}%</td>${nCell}<td class="num">${m.score ? esc(m.score) : "–"}${played ? (m.result === fav ? " ✅" : " ⚡") : ""}</td></tr>${detail}`;
     }).join("");
-    return `<table class="odds"><thead><tr><th>aftrap</th><th>wedstrijd</th><th class="num">1</th><th class="num">X</th><th class="num">2</th><th class="num">marge</th><th class="num">uitslag</th></tr></thead><tbody>${rows}</tbody></table>`;
+    return `<table class="odds"><thead><tr><th>aftrap</th><th>wedstrijd</th><th class="num">1</th><th class="num">X</th><th class="num">2</th><th class="num">marge</th><th class="num" title="aantal bookmakers met odds (klik voor alle odds)">bookm.</th><th class="num">uitslag</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
   function roundDetails(rd, r, done) {
     const c = r.calc, f = c && c.strats.fav, a = c && c.strats.anti;
     return `<details class="ev"><summary><span class="t">${dayhm(r.first_kickoff)}</span>
       <span class="m">${esc(lgName(rd, r.league))} · ${esc(roundName(r))}</span>
-      ${done ? "" : `<span class="pill open">loopt</span>`}
+      ${done ? "" : `<span class="pill open">loopt</span>`}${r.matches && (!done || r.matches.some((m) => !m.odds && m.result !== "void")) ? `<span class="pill" title="wedstrijden in deze speelronde (met odds)">${r.matches.length} wedstr.${r.matches.some((m) => !m.odds && m.result !== "void") ? ` · ${r.matches.filter((m) => m.odds).length} met odds` : ""}</span>` : ""}
       ${c && done && c.settled ? `<span class="pill">${c.settled} wedstr.</span><span class="pill ${f.hits === f.bets ? "ok" : ""}">fav. ${f.hits}/${f.bets}</span>
         <span class="num ${cls(a.profit)}" style="font-family:var(--mono);font-weight:700">tegen fav. ${sgn(a.roi_pct, 1)}%</span>` : ""}</summary>
       <div class="body">${c && done && c.settled ? `<div class="tablewrap" style="margin-bottom:10px">${stratTable(rd, c.strats, r.calc_best?.strats)}</div>` : ""}
-        ${r.matches ? `<p class="muted" style="margin:0 4px 8px">Odds ${esc(r.book)} vastgelegd ${dayhm(r.snapshot_at)} (klein = beste odds van alle bookmakers) · blauw = uitslag · ✅ favoriet won · ⚡ niet</p>${matchTable(r)}`
+        ${r.matches ? `<p class="muted" style="margin:0 4px 8px">${r.mode === "fd" ? "Officiële speelronde (football-data.org). " : ""}Odds ${esc(r.book)} vastgelegd ${r.snapshot_at ? dayhm(r.snapshot_at) : "–"} (klein = beste odds van alle bookmakers; klik op het aantal bookmakers voor alle odds) · blauw = uitslag · ✅ favoriet won · ⚡ niet</p>${matchTable(r)}`
           : `<p class="muted">Details van oudere rondes staan in <code>data/rondes_selecties.csv</code> op de server.</p>`}
         ${(r.removed || []).length ? `<p class="muted" style="margin:8px 4px 0;font-size:11.5px">Weggehaald (hoort niet in ${esc(lgName(rd, r.league))}): ${r.removed.map((m) => `${esc(m.home)} – ${esc(m.away)} <i>(${esc(m.reason || "")})</i>`).join(" · ")}</p>` : ""}</div></details>`;
   }
   function downloadCSV(rd) {
-    const head = ["competitie", "speelronde", "aftrap", "thuis", "uit", "bookmaker", "uitkomst", "odds", "kans_bookmaker", "favoriet", "uitslag", "score", "raak", "beste_odds", "beste_bookmaker"];
+    const head = ["competitie", "speelronde", "aftrap", "thuis", "uit", "bookmaker", "uitkomst", "odds", "kans_bookmaker", "favoriet", "uitslag", "score", "raak", "beste_odds", "beste_bookmaker", "mediaan_odds", "aantal_bookmakers", "odds_alle_bookmakers"];
     const q = (v) => /[;"\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v ?? "");
     const lines = [head.join(";")];
     for (const r of rd.rounds || []) for (const m of r.matches || []) {
@@ -518,7 +527,8 @@
       const mg = 1 / o.H + 1 / o.D + 1 / o.A, fav = favOf(o);
       for (const s of ["H", "D", "A"]) lines.push([r.league, r.matchday || "", m.kickoff, m.home, m.away, m.src || r.book, { H: "1", D: "X", A: "2" }[s],
         String(o[s]).replace(".", ","), String(((1 / o[s]) / mg).toFixed(4)).replace(".", ","), +(s === fav), { H: "1", D: "X", A: "2" }[m.result] || m.result || "",
-        m.score || "", ["H", "D", "A"].includes(m.result) ? +(m.result === s) : "", m.best ? String(m.best[s][0]).replace(".", ",") : "", m.best ? m.best[s][1] : ""].map(q).join(";"));
+        m.score || "", ["H", "D", "A"].includes(m.result) ? +(m.result === s) : "", m.best ? String(m.best[s][0]).replace(".", ",") : "", m.best ? m.best[s][1] : "",
+        m.med ? String(m.med[s]).replace(".", ",") : "", m.n != null ? m.n : "", m.books ? Object.entries(m.books).map(([bk, v]) => `${bk} ${String(v[{ H: 0, D: 1, A: 2 }[s]]).replace(".", ",")}`).join(" | ") : ""].map(q).join(";"));
     }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv" }));
@@ -532,7 +542,8 @@
     if (RF.lg !== "ALL" && !act.includes(RF.lg)) RF.lg = "ALL";
     const t = rd.totals || {}, sel = RF.lg === "ALL" ? t.all : (t.leagues || {})[RF.lg];
     const tot = sel || { rounds: 0, matches: 0, strats: Object.fromEntries(Object.keys(rd.strategies).map((k) => [k, { bets: 0, hits: 0, profit: 0, roi_pct: null }])) };
-    const an = (RF.src === "odds" ? rd.analysis : rd.analysis_best || {})[RF.lg];
+    const SRCN = { odds: esc(rd.bookmaker), best: "beste odds", med: "mediaan alle bookmakers" };
+    const an = ({ odds: rd.analysis, best: rd.analysis_best, med: rd.analysis_med }[RF.src] || rd.analysis || {})[RF.lg];
     const hist = (rd.history || []).filter((h) => RF.lg === "ALL" || h.league === RF.lg);
     const done = (rd.rounds || []).filter((r) => RF.lg === "ALL" || r.league === RF.lg);
     const open = (rd.open || []).filter((r) => RF.lg === "ALL" || r.league === RF.lg);
@@ -541,8 +552,11 @@
       <p class="muted" style="margin-top:6px">Toetst of bookmakers structureel fouten maken in hun 1X2-odds. Van <b>elke</b> wedstrijd in ${act.length || (rd.leagues || []).length} competities worden de odds vastgelegd op het moment
       dat de eerste wedstrijd van de speelronde begint (${esc((rd.bookmakers || [rd.bookmaker]).join(" → "))}; ter vergelijking ook de beste odds van alle bookmakers), en na de ronde naast de uitslagen gelegd.
       <b>Kalibratie</b>: zegt de bookmaker 80%, gebeurt het dan ook 80% van de keren? <b>Strategieën</b>: 1 unit per bet; <i>Alles</i> (1, X én 2) is de referentie en verliest gemiddeld ±de marge.</p>
-      ${(() => { const ck = rd.checks || {}, li = Object.entries(ck.label_issues || {}).sort((a, b) => b[1] - a[1]);
-        return li.length || ck.removed ? `<p class="muted" style="margin-top:8px;font-size:12px">🧭 Competitie-controle: een ploeg telt alleen mee in de competitie waaronder de meeste bookmakers hem zetten.${ck.removed ? ` ${ck.removed} wedstrijd(en) uit de verkeerde competitie weggehaald.` : ""}${li.length ? ` Genegeerd wegens ploegen onder meerdere competities: ${li.map(([b, n]) => `${esc(b)} (${n})`).join(", ")}.` : ""}</p>` : ""; })()}
+      ${(() => { const of = rd.official || {}, ls = of.leagues || [], bad = Object.entries(of.status || {}).filter(([, v]) => !v.ok), cov = of.coverage || [];
+        if (!ls.length) return "";
+        return `<p class="muted" style="margin-top:8px;font-size:12px">📋 Speelrondes volgens de officiële wedstrijdlijst (football-data.org) voor ${ls.map((c) => esc(lgName(rd, c))).join(", ")}: elke ronde bevat álle wedstrijden; per wedstrijd worden de 1X2-odds van alle bookmakers gezocht (op ploegnamen en aftrap, ongeacht onder welke competitie een bookmaker hem zet).</p>`
+          + (bad.length ? `<p style="margin-top:6px;color:var(--warn);font-size:12.5px">⚠️ Wedstrijdlijst ophalen mislukt: ${bad.map(([k, v]) => `${esc(lgName(rd, k))} (${esc(v.error || "")})`).join(", ")}</p>` : "")
+          + (cov.length ? `<p style="margin-top:6px;color:var(--warn);font-size:12.5px">⚠️ Komende wedstrijden met minder dan 3 bookmakers: ${cov.map((c) => `${esc(c.home)} – ${esc(c.away)} (${c.n})`).join(", ")}</p>` : ""); })()}
       ${miss.length ? `<p style="margin-top:8px;color:var(--warn);font-size:13px">⚠️ Geen uitslagbron voor: ${miss.map((c) => esc(lgName(rd, c))).join(", ")} — zet FOOTBALL_DATA_KEY en/of ODDS_API_KEY in .env.</p>` : ""}</div>`;
     h += `<div class="filters" style="margin-top:14px">${["ALL", ...act].map((c) => `<button class="chip ${RF.lg === c ? "on" : ""}" data-lg="${c}">${c === "ALL" ? "Alle competities" : esc(lgName(rd, c))}</button>`).join("")}</div>`;
     const st = tot.strats;
@@ -551,7 +565,8 @@
     h += `<div class="tiles">
       <div class="tile"><div class="kicker">rondes afgesloten</div><div class="big">${tot.rounds}</div><div class="small">${tot.matches} wedstrijden · ${open.length} lopend</div></div>
       ${tileS("alles", "alles (referentie)")}${tileS("fav", "favorieten")}${tileS("anti", "tegen de favoriet")}</div>`;
-    h += sectionHead("kalibratie: kloppen de kansen?", `<a href="#" id="src-sw">${RF.src === "odds" ? "toon beste odds →" : "toon " + esc(rd.bookmaker) + " →"}</a>`);
+    const nextSrc = { odds: "best", best: rd.analysis_med ? "med" : "odds", med: "odds" }[RF.src] || "odds";
+    h += sectionHead(`kalibratie: kloppen de kansen? · ${SRCN[RF.src] || SRCN.odds}`, `<a href="#" id="src-sw">toon ${SRCN[nextSrc]} →</a>`);
     h += calTable(an);
     h += `<p class="muted" style="margin-top:6px">Streep = kans volgens de bookmaker (marge eruit), band = ±2× foutmarge, stip = werkelijk. Valt de stip buiten de band (❗), dan is het verschil waarschijnlijk geen toeval. Met een paar honderd per regel is bijna alles nog ruis.</p>`;
     if (an && an.matches) { h += sectionHead("favorieten per odds-band"); h += bandTable(an); }
@@ -571,7 +586,8 @@
     h += done.length ? done.map((r) => roundDetails(rd, r, true)).join("") : `<div class="empty">Nog geen afgesloten speelrondes.</div>`;
     el.innerHTML = h;
     el.querySelectorAll("[data-lg]").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); RF.lg = b.dataset.lg; renderRondes(); }));
-    $("src-sw").onclick = (e) => { e.preventDefault(); RF.src = RF.src === "odds" ? "best" : "odds"; renderRondes(); };
+    $("src-sw").onclick = (e) => { e.preventDefault(); RF.src = nextSrc; renderRondes(); };
+    el.querySelectorAll("[data-bk]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); const row = document.getElementById("bk-" + a.dataset.bk); if (row) row.style.display = row.style.display === "none" ? "" : "none"; }));
     $("csv-dl").onclick = (e) => { e.preventDefault(); downloadCSV(rd); };
     bindTips(el);
   }
