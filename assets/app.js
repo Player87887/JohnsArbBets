@@ -556,7 +556,9 @@
         if (!ls.length) return "";
         return `<p class="muted" style="margin-top:8px;font-size:12px">📋 Speelrondes volgens de officiële wedstrijdlijst (football-data.org) voor ${ls.map((c) => esc(lgName(rd, c))).join(", ")}: elke ronde bevat álle wedstrijden; per wedstrijd worden de 1X2-odds van alle bookmakers gezocht (op ploegnamen en aftrap, ongeacht onder welke competitie een bookmaker hem zet).</p>`
           + (bad.length ? `<p style="margin-top:6px;color:var(--warn);font-size:12.5px">⚠️ Wedstrijdlijst ophalen mislukt: ${bad.map(([k, v]) => `${esc(lgName(rd, k))} (${esc(v.error || "")})`).join(", ")}</p>` : "")
-          + (cov.length ? `<p style="margin-top:6px;color:var(--warn);font-size:12.5px">⚠️ Komende wedstrijden met minder dan 3 bookmakers: ${cov.map((c) => `${esc(c.home)} – ${esc(c.away)} (${c.n})`).join(", ")}</p>` : ""); })()}
+          + (cov.length ? `<p style="margin-top:6px;color:var(--warn);font-size:12.5px">⚠️ Komende wedstrijden met minder dan 3 bookmakers: ${cov.map((c) => `${esc(c.home)} – ${esc(c.away)} (${c.n})`).join(", ")}</p>` : "")
+          + ((of.discarded || []).length ? `<details style="margin-top:6px;font-size:12px"><summary class="muted" style="cursor:pointer">🗑 ${of.discarded.length} oude ronde(s) verwijderd: geen enkele wedstrijd stond in de officiële wedstrijdlijst</summary>${of.discarded.map((d) =>
+              `<p class="muted" style="margin:4px 0 0 14px"><b>${esc(lgName(rd, d.league))}</b> ${d.first_kickoff ? dayhm(d.first_kickoff) : ""}: ${(d.matches || []).map(esc).join(" · ")}</p>`).join("")}</details>` : ""); })()}
       ${miss.length ? `<p style="margin-top:8px;color:var(--warn);font-size:13px">⚠️ Geen uitslagbron voor: ${miss.map((c) => esc(lgName(rd, c))).join(", ")} — zet FOOTBALL_DATA_KEY en/of ODDS_API_KEY in .env.</p>` : ""}</div>`;
     h += `<div class="filters" style="margin-top:14px">${["ALL", ...act].map((c) => `<button class="chip ${RF.lg === c ? "on" : ""}" data-lg="${c}">${c === "ALL" ? "Alle competities" : esc(lgName(rd, c))}</button>`).join("")}</div>`;
     const st = tot.strats;
