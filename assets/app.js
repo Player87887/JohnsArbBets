@@ -506,7 +506,8 @@
         <span class="num ${cls(a.profit)}" style="font-family:var(--mono);font-weight:700">tegen fav. ${sgn(a.roi_pct, 1)}%</span>` : ""}</summary>
       <div class="body">${c && done && c.settled ? `<div class="tablewrap" style="margin-bottom:10px">${stratTable(rd, c.strats, r.calc_best?.strats)}</div>` : ""}
         ${r.matches ? `<p class="muted" style="margin:0 4px 8px">Odds ${esc(r.book)} vastgelegd ${dayhm(r.snapshot_at)} (klein = beste odds van alle bookmakers) · blauw = uitslag · ✅ favoriet won · ⚡ niet</p>${matchTable(r)}`
-          : `<p class="muted">Details van oudere rondes staan in <code>data/rondes_selecties.csv</code> op de server.</p>`}</div></details>`;
+          : `<p class="muted">Details van oudere rondes staan in <code>data/rondes_selecties.csv</code> op de server.</p>`}
+        ${(r.removed || []).length ? `<p class="muted" style="margin:8px 4px 0;font-size:11.5px">Weggehaald (hoort niet in ${esc(lgName(rd, r.league))}): ${r.removed.map((m) => `${esc(m.home)} – ${esc(m.away)} <i>(${esc(m.reason || "")})</i>`).join(" · ")}</p>` : ""}</div></details>`;
   }
   function downloadCSV(rd) {
     const head = ["competitie", "speelronde", "aftrap", "thuis", "uit", "bookmaker", "uitkomst", "odds", "kans_bookmaker", "favoriet", "uitslag", "score", "raak", "beste_odds", "beste_bookmaker"];
@@ -540,6 +541,8 @@
       <p class="muted" style="margin-top:6px">Toetst of bookmakers structureel fouten maken in hun 1X2-odds. Van <b>elke</b> wedstrijd in ${act.length || (rd.leagues || []).length} competities worden de odds vastgelegd op het moment
       dat de eerste wedstrijd van de speelronde begint (${esc((rd.bookmakers || [rd.bookmaker]).join(" → "))}; ter vergelijking ook de beste odds van alle bookmakers), en na de ronde naast de uitslagen gelegd.
       <b>Kalibratie</b>: zegt de bookmaker 80%, gebeurt het dan ook 80% van de keren? <b>Strategieën</b>: 1 unit per bet; <i>Alles</i> (1, X én 2) is de referentie en verliest gemiddeld ±de marge.</p>
+      ${(() => { const ck = rd.checks || {}, li = Object.entries(ck.label_issues || {}).sort((a, b) => b[1] - a[1]);
+        return li.length || ck.removed ? `<p class="muted" style="margin-top:8px;font-size:12px">🧭 Competitie-controle: een ploeg telt alleen mee in de competitie waaronder de meeste bookmakers hem zetten.${ck.removed ? ` ${ck.removed} wedstrijd(en) uit de verkeerde competitie weggehaald.` : ""}${li.length ? ` Genegeerd wegens ploegen onder meerdere competities: ${li.map(([b, n]) => `${esc(b)} (${n})`).join(", ")}.` : ""}</p>` : ""; })()}
       ${miss.length ? `<p style="margin-top:8px;color:var(--warn);font-size:13px">⚠️ Geen uitslagbron voor: ${miss.map((c) => esc(lgName(rd, c))).join(", ")} — zet FOOTBALL_DATA_KEY en/of ODDS_API_KEY in .env.</p>` : ""}</div>`;
     h += `<div class="filters" style="margin-top:14px">${["ALL", ...act].map((c) => `<button class="chip ${RF.lg === c ? "on" : ""}" data-lg="${c}">${c === "ALL" ? "Alle competities" : esc(lgName(rd, c))}</button>`).join("")}</div>`;
     const st = tot.strats;
@@ -574,7 +577,12 @@
   }
 
   // ---------------------------------------------------------------- boosts
-  const BF = { day: "all", book: "", unknown: false };
+  const BF = { day: "all", book: "", unknown: false, sport: "" };
+  function sportTag(b) {
+    const sp = ((S.boosts && S.boosts.sports) || {})[b.sport];
+    return sp ? `<span class="pill" style="margin-right:6px" title="${esc(sp[1])}">${sp[0]} ${esc(sp[1])}</span>`
+      : `<span class="pill" style="margin-right:6px;opacity:.6" title="sport onbekend">❔ onbekend</span>`;
+  }
   function bDay(iso) {
     if (!iso) return "zonder datum";
     const d = new Date(iso), key = (x) => x.toLocaleDateString("nl-NL", { timeZone: TZ });
@@ -596,7 +604,7 @@
     const newCell = b.new ? `<b${b.new_approx ? ' title="benadering: TonyBet rondt zelf iets anders af"' : ""}>${b.new_approx ? "≈" : ""}${num(b.new)}</b>` : (b.image ? `<span class="muted" title="staat in het plaatje">🖼</span>` : "–");
     return `<tr class="${big || b.image ? "" : "dim"}"><td class="mono">${b.start ? dayhm(b.start) : "–"}</td>
       <td><b>${esc(b.book)}</b>${b.top ? ` <span class="pill ok" title="plek in de top van deze bookmaker">#${b.top}</span>` : ""}<div class="muted" style="font-size:11px">${esc(b.name && b.name !== b.title ? b.name : b.kind || "")}</div></td>
-      <td>${esc(b.event || "")}<div style="color:var(--ink)">${esc(b.title || "")}${b.selection ? ` → <b>${esc(b.selection)}</b>` : ""}</div>${legs}
+      <td>${sportTag(b)}${esc(b.event || "")}<div style="color:var(--ink)">${esc(b.title || "")}${b.selection ? ` → <b>${esc(b.selection)}</b>` : ""}</div>${legs}
         ${meta ? `<div class="muted" style="font-size:11px">${meta}</div>` : ""}${img}</td>
       <td class="num">${b.old ? num(b.old) : "–"}${b.old_banner ? `<div class="muted" style="font-size:11px" title="volgens de banner">banner ${num(b.old_banner)}</div>` : ""}</td><td class="num">${newCell}</td>
       <td class="num">${pct == null ? `<span class="muted">?</span>` : `<b style="color:${col}">+${num(pct, 0)}%</b>`}</td><td>${src}</td>
@@ -612,7 +620,11 @@
     if (bd.disabled) { el.innerHTML = `<div class="empty">Boost-radar staat uit (config: <code>boosts.enabled</code>).</div>`; return; }
     const min = bd.min_pct || 20, act = bd.active || [];
     const books = [...new Set(act.map((b) => b.book))].sort();
-    const pass = (b) => (!BF.book || b.book === BF.book) && (BF.day === "all" || bDay(b.start) === BF.day);
+    const pass = (b) => (!BF.book || b.book === BF.book) && (BF.day === "all" || bDay(b.start) === BF.day)
+      && (!BF.sport || (b.sport || "?") === BF.sport);
+    const spNames = bd.sports || {}, spCount = {};
+    for (const b of act) if (b.kind !== "promo") spCount[b.sport || "?"] = (spCount[b.sport || "?"] || 0) + 1;
+    const spOrder = Object.keys(spCount).sort((a, b) => (a === "football" ? -1 : b === "football" ? 1 : spCount[b] - spCount[a]));
     const perBook = bd.per_book || 3, maxOdds = bd.max_odds || 8;
     const big = act.filter((b) => b.pct != null && b.pct >= min && pass(b)).sort((a, b) => b.pct - a.pct);
     const top = big.filter((b) => b.top).sort((a, b) => a.book.localeCompare(b.book) || a.top - b.top);
@@ -636,13 +648,14 @@
       <p class="muted" style="font-size:11.5px;margin-top:6px">Per bookmaker: aantal ≥ ${num(min, 0)}% / totaal gevonden. Klik op een bookmaker om al zijn boosts te zien, ook kleinere en die zonder bekende oude odd.</p></div>`;
     const days = ["all", ...new Set(act.filter((b) => b.kind !== "promo").map((b) => bDay(b.start)))];
     h += `<div class="filters" style="margin-top:14px">${days.map((d) => `<button class="chip ${BF.day === d ? "on" : ""}" data-day="${esc(d)}">${d === "all" ? "Alle dagen" : esc(d)}</button>`).join("")}
-      <select id="bk-book"><option value="">Alle bookmakers</option>${books.map((b) => `<option ${BF.book === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select></div>`;
+      <select id="bk-book"><option value="">Alle bookmakers</option>${books.map((b) => `<option ${BF.book === b ? "selected" : ""}>${esc(b)}</option>`).join("")}</select>
+      <select id="bk-sport"><option value="">Alle sporten</option>${spOrder.map((k) => `<option value="${esc(k)}" ${BF.sport === k ? "selected" : ""}>${spNames[k] ? spNames[k][0] + " " + esc(spNames[k][1]) : "❔ onbekend"} (${spCount[k]})</option>`).join("")}</select></div>`;
     h += `<div class="tiles"><div class="tile"><div class="kicker">top ${perBook} per bookmaker</div><div class="big">${top.length}</div><div class="small">${new Set(top.map((b) => b.book)).size} bookmaker(s) · odd ≤ ${num(maxOdds, 0)}</div></div>
       <div class="tile"><div class="kicker">kleiner dan ${num(min, 0)}%</div><div class="big">${small.length}</div><div class="small">oude odd bekend</div></div>
       <div class="tile"><div class="kicker">oude odd onbekend</div><div class="big">${unk.length}</div><div class="small">+ ${banners.length} banner(s), ${promos.length} promo('s)</div></div>
       <div class="tile"><div class="kicker">bookmakers met boosts</div><div class="big">${books.length}</div><div class="small">van ${Object.keys(st).length} gecontroleerd</div></div></div>`;
     h += sectionHead(`top ${perBook} per bookmaker (≥ ${num(min, 0)}%, odd ≤ ${num(maxOdds, 0)}, hoog % én lage odd)`);
-    h += top.length ? bTable(top, min) : `<div class="empty">Geen boosts boven de grens${BF.day !== "all" || BF.book ? " met dit filter" : ""}.</div>`;
+    h += top.length ? bTable(top, min) : `<div class="empty">Geen boosts boven de grens${BF.day !== "all" || BF.book || BF.sport ? " met dit filter" : ""}.</div>`;
     if (rest.length) {
       h += sectionHead(`overige boosts ≥ ${num(min, 0)}% (buiten de top of odd > ${num(maxOdds, 0)})`);
       h += bTable(rest, min);
@@ -664,13 +677,14 @@
     if (small.length) {
       h += `<details class="ev" style="margin-top:14px"${BF.book ? " open" : ""}><summary><span class="m">Kleinere boosts (&lt; ${num(min, 0)}%) · ${small.length}</span></summary><div class="body">${bTable(small.slice(0, 200), min)}</div></details>`;
     }
-    const hist = (bd.history || []).filter((b) => b.pct != null && b.pct >= min && (!BF.book || b.book === BF.book)).slice(0, 60);
+    const hist = (bd.history || []).filter((b) => b.pct != null && b.pct >= min && (!BF.book || b.book === BF.book) && (!BF.sport || (b.sport || "?") === BF.sport)).slice(0, 60);
     if (hist.length) {
       h += `<details class="ev" style="margin-top:10px"><summary><span class="m">Verlopen grote boosts (laatste 14 dagen) · ${hist.length}</span></summary><div class="body">${bTable(hist, min)}</div></details>`;
     }
     el.innerHTML = h;
     el.querySelectorAll("[data-day]").forEach((b) => b.addEventListener("click", () => { BF.day = b.dataset.day; renderBoosts(); }));
     $("bk-book").onchange = (e) => { BF.book = e.target.value; renderBoosts(); };
+    $("bk-sport").onchange = (e) => { BF.sport = e.target.value; renderBoosts(); };
     $("bk-unk").onclick = (e) => { e.preventDefault(); if (BF.book && !BF.unknown) { BF.book = ""; } else BF.unknown = !BF.unknown; renderBoosts(); };
     el.querySelectorAll("[data-pbook]").forEach((p) => p.addEventListener("click", () => { BF.book = BF.book === p.dataset.pbook ? "" : p.dataset.pbook; renderBoosts(); }));
   }
